@@ -3,6 +3,91 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased
+
+## Fix
+
+- **nice-grpc-server-reflection:** Add lossless `ServerReflection`
+  implementation, where file descriptor values are returned as provided in the
+  input protobuf file descriptor set, without any re-encoding. This
+  implementation is now the default.
+
+  The `ServerReflection` function can now accepts an `options` object instead of
+  a list of service names, the service name list is still supported. The
+  `options` object can be used to configure the behavior of the service
+  implementation.
+
+  The following options are supported:
+
+  - `serviceNames` (required): specifies which services should be exposed by the
+    returned implementation. Passing the service name list directly is
+    equivalent to setting this field and using defaults for the other options.
+  - `fdProtoMode`: specifies how file descriptor values should be generated. The
+    different mods are:
+    - `"slice"`: Copy slices from the input `protoset` value.
+    - `"subarray"`: Use subarray views into the input `protoset` value. The
+      input `protoset` must be immutable to avoid unexpected behavior.
+    - `"encode"`: Decode, then re-encode the input `protoset` value, this is the
+      old behavior.
+
+  Given the following protobuf definition:
+
+  ```proto
+  syntax = "proto3";
+
+  import "google/protobuf/descriptor.proto";
+
+  package nice_grpc.test;
+
+  extend google.protobuf.ServiceOptions {
+    optional string version = 50000;
+  }
+
+  service Test {
+    option (nice_grpc.test.version) = "1.0.0";
+
+    rpc TestUnary(TestRequest) returns (TestResponse) {};
+  }
+
+  message TestRequest {}
+  message TestResponse {}
+  ```
+
+  And the following TypeScript code:
+
+  ```typescript
+  const protoset = fs.readFileSync('protoset.binpb');
+
+  // equivalent to:
+  // const sliceImpl = ServerReflection(protoset, [MyService.fullName]);
+  const sliceImpl = ServerReflection(protoset, {
+    serviceNames: [MyService.fullName],
+    fdProtoMode: 'slice',
+  });
+
+  const subarrayImpl = ServerReflection(protoset, {
+    serviceNames: [MyService.fullName],
+    fdProtoMode: 'subarray',
+  });
+
+  const encodeImpl = ServerReflection(protoset, {
+    serviceNames: [MyService.fullName],
+    fdProtoMode: 'encode',
+  });
+  ```
+
+  By default, `encodeImpl` will be missing the extension value
+  `nice_grpc.test.version = "1.0.0"` because it is unknown and will be dropped
+  during decoding/re-encoding. Both `sliceImpl` and `subarrayImpl` are lossless
+  and will return the file descriptor as provided: all the generated data inside
+  the protoset will be returned as-is. The only difference between `sliceImpl`
+  and `subarrayImpl` is that `sliceImpl` will copy slices from the input
+  `protoset` value, while `subarrayImpl` will use subarray views into the input
+  `protoset` value. The input `protoset` must be immutable to avoid unexpected
+  behavior when using the `subarray` mode.
+
+- **nice-grpc-server-reflection:** Mark the `serviceNames` option as readonly.
+
 ## [3.0.0](https://github.com/deeplay-io/nice-grpc/compare/nice-grpc-server-reflection@2.0.14...nice-grpc-server-reflection@3.0.0) (2025-04-30)
 
 ### ⚠ BREAKING CHANGES

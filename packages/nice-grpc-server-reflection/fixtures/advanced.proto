@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+
+package nice_grpc.test;
+
+extend google.protobuf.ServiceOptions {
+  optional string version = 50000;
+}
+
+service AdvancedTest {
+  option (nice_grpc.test.version) = "1.0.0";
+
+  rpc TestUnary(AdvancedTestRequest) returns (AdvancedTestResponse) {};
+}
+
+message AdvancedTestRequest {}
+message AdvancedTestResponse {}
